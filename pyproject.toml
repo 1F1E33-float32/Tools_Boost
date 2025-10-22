@@ -1,0 +1,12 @@
+[build-system]
+requires = ["scikit-build-core", "nanobind", "ninja"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "tools-boost"
+version = "1.0.0"
+requires-python = ">=3.13"
+
+[tool.scikit-build]
+build-dir = "build/{wheel_tag}"
+editable.rebuild = true
