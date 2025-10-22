@@ -1,4 +1,3 @@
-// hcadecrypt_nanobind.cpp
 #include <nanobind/nanobind.h>
 
 #include <array>

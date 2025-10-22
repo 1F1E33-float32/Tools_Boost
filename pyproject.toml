@@ -6,6 +6,7 @@ build-backend = "scikit_build_core.build"
 name = "tools-boost"
 version = "1.0.0"
 requires-python = ">=3.13"
+dependencies = []
 
 [tool.scikit-build]
 build-dir = "build/{wheel_tag}"

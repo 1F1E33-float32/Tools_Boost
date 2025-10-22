@@ -18,3 +18,6 @@ target_compile_features(tools_boost PRIVATE cxx_std_17)
 
 # 安装模块
 install(TARGETS tools_boost LIBRARY DESTINATION .)
+
+# 安装类型存根文件 (.pyi)
+install(FILES "${CMAKE_SOURCE_DIR}/tools_boost.pyi" DESTINATION .)
