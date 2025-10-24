@@ -1,6 +1,6 @@
 from typing import Optional
 
-class cat_system_crypto:
+class catsystem2_crypto:
     class MT:
         """Mersenne Twister random number generator"""
         def __init__(self, seed: int) -> None:
@@ -63,6 +63,32 @@ class hca_decryptor:
 
         Raises:
             RuntimeError: If file is invalid or decryption fails
+        """
+        ...
+
+class xpcm_extractor:
+    @staticmethod
+    def xpcm_to_pcm(xpcm_data: bytes) -> tuple[bytes, dict[str, int]]:
+        """
+        Decompress XPCM audio data to raw PCM format.
+
+        Args:
+            xpcm_data: XPCM compressed audio data (bytes)
+
+        Returns:
+            A tuple containing:
+            - pcm_data (bytes): Raw PCM audio data
+            - metadata (dict): Dictionary with audio metadata:
+                * sample_rate (int): Sample rate in Hz
+                * channels (int): Number of audio channels
+                * bits_per_sample (int): Bit depth (usually 16)
+                * num_samples (int): Total number of samples
+                * pcm_size (int): Total size of PCM data in bytes
+                * codec (int): XPCM codec identifier (0x00, 0x01, 0x03, 0x04)
+                * flags (int): XPCM flags
+
+        Raises:
+            RuntimeError: If XPCM data is invalid or decompression fails
         """
         ...
 

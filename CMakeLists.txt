@@ -1,23 +1,27 @@
-cmake_minimum_required(VERSION 3.15...3.27)
+cmake_minimum_required(VERSION 3.15)
 project(${SKBUILD_PROJECT_NAME} LANGUAGES CXX)
 
-# 查找 Python 和 nanobind
 find_package(Python 3.13 COMPONENTS Interpreter Development.Module REQUIRED)
-find_package(nanobind CONFIG REQUIRED)
 
-# 创建 Python 扩展模块
+add_subdirectory(_ThirdParty/nanobind)
+add_subdirectory(_ThirdParty/zlib)
+
 nanobind_add_module(
     tools_boost
     src/main.cpp
-    src/cat_system_crypto.cpp
+    src/catsystem2_crypto.cpp
     src/hca_decryptor.cpp
+    src/xpcm_extractor.cpp
 )
 
-# 设置 C++ 标准
 target_compile_features(tools_boost PRIVATE cxx_std_17)
 
-# 安装模块
-install(TARGETS tools_boost LIBRARY DESTINATION .)
+target_link_libraries(tools_boost PRIVATE zlibstatic)
 
-# 安装类型存根文件 (.pyi)
+target_include_directories(tools_boost PRIVATE 
+    ${CMAKE_SOURCE_DIR}/_ThirdParty/zlib
+    ${CMAKE_BINARY_DIR}/_ThirdParty/zlib
+)
+
+install(TARGETS tools_boost LIBRARY DESTINATION .)
 install(FILES "${CMAKE_SOURCE_DIR}/tools_boost.pyi" DESTINATION .)

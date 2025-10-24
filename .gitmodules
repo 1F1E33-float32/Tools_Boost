@@ -1,0 +1,7 @@
+[submodule "_ThirdParty/zlib"]
+	path = _ThirdParty/zlib
+	url = https://github.com/madler/zlib.git
+	branch = master
+[submodule "_ThirdParty/nanobind"]
+	path = _ThirdParty/nanobind
+	url = https://github.com/wjakob/nanobind.git

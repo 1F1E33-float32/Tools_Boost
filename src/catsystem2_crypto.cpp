@@ -1,12 +1,19 @@
 #include <nanobind/nanobind.h>
-#include <nanobind/stl/string.h>
 #include <array>
 #include <vector>
 
-inline uint32_t _32(uint64_t x)
+// ============================================================================
+// Utility Functions
+// ============================================================================
+
+static inline uint32_t _32(uint64_t x)
 {
     return static_cast<uint32_t>(x & 0xFFFFFFFF);
 }
+
+// ============================================================================
+// Structures (Classes)
+// ============================================================================
 
 class MT
 {
@@ -60,7 +67,7 @@ private:
         uint8_t a = static_cast<uint8_t>(x >> 24); // MSB
         uint8_t b = static_cast<uint8_t>(x >> 16);
         uint8_t c = static_cast<uint8_t>(x >> 8);
-        uint8_t d = static_cast<uint8_t>(x);       // LSB
+        uint8_t d = static_cast<uint8_t>(x); // LSB
         uint32_t y = _32(S[0][a] + S[1][b]);
         y = _32((y ^ S[2][c]) + S[3][d]);
         return y;
@@ -95,10 +102,11 @@ private:
 public:
     explicit Blowfish(nanobind::bytes key_bytes)
     {
-        const uint8_t* key_data = static_cast<const uint8_t*>(key_bytes.data());
+        const uint8_t *key_data = static_cast<const uint8_t *>(key_bytes.data());
         size_t key_size = key_bytes.size();
         std::vector<uint8_t> key(key_data, key_data + key_size);
 
+        // clang-format off
         P = {{0x243F6A88, 0x85A308D3, 0x13198A2E, 0x03707344, 0xA4093822, 0x299F31D0, 0x082EFA98, 0xEC4E6C89,
               0x452821E6, 0x38D01377, 0xBE5466CF, 0x34E90C6C, 0xC0AC29B7, 0xC97C50DD, 0x3F84D5B5, 0xB5470917,
               0x9216D5D9, 0x8979FB1B}};
@@ -234,6 +242,7 @@ public:
                  0x53113EC0, 0x1640E3D3, 0x38ABBD60, 0x2547ADF0, 0xBA38209C, 0xF746CE76, 0x77AFA1C5, 0x20756060,
                  0x85CBFE4E, 0x8AE88DD8, 0x7AAAF9B0, 0x4CF9AA7E, 0x1948C25C, 0x02FB8A8C, 0x01C36AE4, 0xD6EBE1F9,
                  0x90D4F869, 0xA65CDEA0, 0x3F09252D, 0xC208E69F, 0xB74E6132, 0xCE77E25B, 0x578FDFE3, 0x3AC372E6}};
+        // clang-format on
 
         std::vector<uint32_t> keyData;
         size_t keySize = (0x48 / key.size() + 1) * key.size();
@@ -243,7 +252,7 @@ public:
             expandedKey.push_back(key[i % key.size()]);
         }
 
-        // Convert to big-endian 32-bit values (matching Python's '>18I')
+        // Convert to big-endian 32-bit values
         for (size_t i = 0; i < 18; ++i)
         {
             uint32_t val = 0;
@@ -286,7 +295,7 @@ public:
 
     nanobind::bytes decrypt(nanobind::bytes ciphertext_bytes)
     {
-        const uint8_t* ciphertext_data = static_cast<const uint8_t*>(ciphertext_bytes.data());
+        const uint8_t *ciphertext_data = static_cast<const uint8_t *>(ciphertext_bytes.data());
         size_t ciphertext_size = ciphertext_bytes.size();
         std::vector<uint8_t> ciphertext(ciphertext_data, ciphertext_data + ciphertext_size);
 
@@ -300,7 +309,7 @@ public:
 
         for (size_t i = 0; i < ciphertext.size(); i += 8)
         {
-            // Read as little-endian 32-bit integers (matching Python's '<II')
+            // Read as little-endian 32-bit integers
             uint32_t xl = ciphertext[i] | (ciphertext[i + 1] << 8) | (ciphertext[i + 2] << 16) | (ciphertext[i + 3] << 24);
             uint32_t xr = ciphertext[i + 4] | (ciphertext[i + 5] << 8) | (ciphertext[i + 6] << 16) | (ciphertext[i + 7] << 24);
 
@@ -308,7 +317,7 @@ public:
             xl = result.first;
             xr = result.second;
 
-            // Write as little-endian 32-bit integers (matching Python's '<II')
+            // Write as little-endian 32-bit integers
             plaintext.push_back(xl & 0xFF);
             plaintext.push_back((xl >> 8) & 0xFF);
             plaintext.push_back((xl >> 16) & 0xFF);
@@ -323,13 +332,44 @@ public:
     }
 };
 
-void init_cat_system_crypto(nanobind::module_& m)
-{
-    nanobind::class_<MT>(m, "MT")
-        .def(nanobind::init<uint32_t>())
-        .def("genrand", &MT::genrand);
+// ============================================================================
+// Module Initialization
+// ============================================================================
 
-    nanobind::class_<Blowfish>(m, "Blowfish")
-        .def(nanobind::init<nanobind::bytes>())
-        .def("decrypt", &Blowfish::decrypt);
+void init_catsystem2_crypto(nanobind::module_ &m)
+{
+    m.doc() = "CatSystem2 crypto utilities";
+
+    // Python API: MT(seed: int)
+    nanobind::class_<MT>(m, "MT", R"pbdoc(
+Mersenne Twister 19937 pseudo-random number generator.
+
+Args:
+  seed: 32-bit unsigned integer seed for initialization
+)pbdoc")
+        .def(nanobind::init<uint32_t>(), nanobind::arg("seed"), "Initialize MT with given seed")
+        .def("genrand", &MT::genrand, R"pbdoc(
+Generate next random 32-bit unsigned integer.
+
+Returns:
+  uint32_t: Next random number in the sequence
+)pbdoc");
+
+    // Python API: Blowfish(key: bytes)
+    nanobind::class_<Blowfish>(m, "Blowfish", R"pbdoc(
+Blowfish cipher for decryption.
+
+Args:
+  key: Encryption key as bytes
+)pbdoc")
+        .def(nanobind::init<nanobind::bytes>(), nanobind::arg("key"), "Initialize Blowfish with given key")
+        .def("decrypt", &Blowfish::decrypt, nanobind::arg("ciphertext"), R"pbdoc(
+Decrypt ciphertext using Blowfish.
+
+Args:
+  ciphertext: Encrypted data as bytes (must be multiple of 8 bytes)
+
+Returns:
+  bytes: Decrypted plaintext
+)pbdoc");
 }

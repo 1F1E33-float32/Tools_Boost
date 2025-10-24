@@ -1,17 +1,27 @@
 #include <nanobind/nanobind.h>
 
-namespace nb = nanobind;
+// ============================================================================
+// Module declarations
+// ============================================================================
 
-void init_cat_system_crypto(nb::module_& m);
-void init_hca_decryptor(nb::module_& m);
+void init_catsystem2_crypto(nanobind::module_& m);
+void init_hca_decryptor(nanobind::module_& m);
+void init_xpcm_extractor(nanobind::module_& m);
+
+// ============================================================================
+// Module initialization
+// ============================================================================
 
 NB_MODULE(tools_boost, m)
 {
     m.doc() = "Tools Boost";
 
-    auto cat_crypto = m.def_submodule("cat_system_crypto", "CAT System crypto utilities");
-    init_cat_system_crypto(cat_crypto);
+    nanobind::module_ cat_crypto = m.def_submodule("catsystem2_crypto", "CatSystem2 crypto utilities");
+    init_catsystem2_crypto(cat_crypto);
 
-    auto hca_dec = m.def_submodule("hca_decryptor", "HCA decryption utilities");
+    nanobind::module_ hca_dec = m.def_submodule("hca_decryptor", "HCA decryption utilities");
     init_hca_decryptor(hca_dec);
+
+    nanobind::module_ xpcm_ext = m.def_submodule("xpcm_extractor", "XPCM extraction utilities");
+    init_xpcm_extractor(xpcm_ext);
 }
