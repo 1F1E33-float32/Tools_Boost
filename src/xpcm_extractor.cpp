@@ -894,15 +894,17 @@ bool XpcmVqDecoder::decode_frame(const int16_t **out, int *out_samples_all)
 // Main Logic
 // ============================================================================
 
-static nanobind::bytes xpcm_to_pcm(nanobind::bytes xpcm_bytes)
+static nanobind::tuple xpcm_to_pcm(nanobind::bytes xpcm_bytes)
 {
     char *p = nullptr;
     Py_ssize_t n = 0;
     if (PyBytes_AsStringAndSize(xpcm_bytes.ptr(), &p, &n) != 0)
         throw nanobind::python_error();
+
     const uint8_t *d = reinterpret_cast<const uint8_t *>(p);
     size_t sz = (size_t)n;
-    if (sz < 0x1C)
+
+    if (sz < 0x10)
         throw std::runtime_error("XPCM: buffer too small");
     if (!(d[0] == 'X' && d[1] == 'P' && d[2] == 'C' && d[3] == 'M'))
         throw std::runtime_error("XPCM: bad magic");
@@ -911,19 +913,41 @@ static nanobind::bytes xpcm_to_pcm(nanobind::bytes xpcm_bytes)
     uint8_t codec = d[0x08];
     uint8_t flags = d[0x09];
     uint16_t channels = read_u16le(d + 0x0E);
-    int32_t sample_rate = read_s32le(d + 0x10);
-    (void)sample_rate;
-
-    const size_t start_offset = 0x1C;
-    if (sz < start_offset)
-        throw std::runtime_error("XPCM: truncated header");
 
     std::vector<uint8_t> out;
-    out.reserve(pcm_size);
 
-    if (codec == 0x00)
+    int meta_sample_rate = -1;
+    int meta_channels = -1;
+    int meta_bits_per_sample = -1;
+    int meta_num_samples = -1;
+    int meta_pcm_size = -1;
+
+    switch (codec)
     {
-        // Raw PCM16LE interleaved
+    case 0x05:
+    { // OGG passthrough: size at 0x0C..0x0F, data from 0x10
+        if (sz < 0x10)
+            throw std::runtime_error("XPCM: truncated OGG header");
+        uint32_t ogg_size = read_u32le(d + 0x0C);
+        const size_t ogg_offset = 0x10;
+        if (sz < ogg_offset + (size_t)ogg_size)
+            throw std::runtime_error("XPCM: truncated OGG stream");
+
+        out.assign(d + ogg_offset, d + ogg_offset + ogg_size);
+        goto pack_and_return;
+    }
+
+    case 0x00:
+    { // Raw PCM16LE interleaved
+        const size_t start_offset = 0x1C;
+        if (sz < start_offset)
+            throw std::runtime_error("XPCM: truncated header");
+
+        int32_t sample_rate = read_s32le(d + 0x10);
+        uint16_t bits_per_sample = read_u16le(d + 0x1A);
+        if (channels == 0)
+            throw std::runtime_error("XPCM: invalid channel count");
+
         if (sz < start_offset + pcm_size)
         {
             size_t avail = sz - start_offset;
@@ -935,26 +959,58 @@ static nanobind::bytes xpcm_to_pcm(nanobind::bytes xpcm_bytes)
         {
             out.insert(out.end(), d + start_offset, d + start_offset + pcm_size);
         }
+
+        meta_sample_rate = sample_rate;
+        meta_channels = (int)channels;
+        meta_bits_per_sample = (int)bits_per_sample;
+        meta_pcm_size = (int)pcm_size;
+        meta_num_samples = (int)(pcm_size / (2u * channels));
+        goto pack_and_return;
     }
-    else if (codec == 0x02)
-    {
-        // ADPCM (mode 2): 1 byte per sample per channel
+
+    case 0x02:
+    { // ADPCM (mode 2): 1 byte per sample per channel
+        const size_t start_offset = 0x1C;
+        if (sz < start_offset)
+            throw std::runtime_error("XPCM: truncated header");
+        if (channels == 0)
+            throw std::runtime_error("XPCM: invalid channel count");
+
+        int32_t sample_rate = read_s32le(d + 0x10);
+        uint16_t bits_per_sample = read_u16le(d + 0x1A);
+
         int64_t samples_per_ch = (int64_t)pcm_size / 2 / channels;
         const uint8_t *comp = d + start_offset;
         size_t comp_size = sz - start_offset;
+
         std::vector<int16_t> tmp;
         decode_adpcm_mode2(comp, comp_size, channels, samples_per_ch, tmp);
+
         out.resize((size_t)pcm_size);
         std::memcpy(out.data(), tmp.data(), out.size());
+
+        meta_sample_rate = sample_rate;
+        meta_channels = (int)channels;
+        meta_bits_per_sample = (int)bits_per_sample;
+        meta_pcm_size = (int)pcm_size;
+        meta_num_samples = (int)(pcm_size / (2u * channels));
+        goto pack_and_return;
     }
-    else if (codec == 0x01 || codec == 0x03)
-    {
-        // VQ: compressed size at 0x1C (ignored), stream from 0x20
+
+    case 0x01:
+    case 0x03:
+    { // VQ variant
         if (sz < 0x20)
             throw std::runtime_error("XPCM: truncated VQ header");
+
+        int32_t sample_rate = read_s32le(d + 0x10);
+        uint16_t bits_per_sample = read_u16le(d + 0x1A);
+
         const uint8_t *comp = d + 0x20;
         size_t comp_size = sz - 0x20;
+
         XpcmVqDecoder dec(comp, comp_size, codec, flags);
+        out.reserve(pcm_size);
         while (out.size() < pcm_size)
         {
             const int16_t *buf = nullptr;
@@ -966,50 +1022,32 @@ static nanobind::bytes xpcm_to_pcm(nanobind::bytes xpcm_bytes)
                 bytes = need;
             out.insert(out.end(), reinterpret_cast<const uint8_t *>(buf), reinterpret_cast<const uint8_t *>(buf) + bytes);
         }
+
+        meta_sample_rate = sample_rate;
+        meta_channels = (int)channels;
+        meta_bits_per_sample = (int)bits_per_sample;
+        meta_pcm_size = (int)pcm_size;
+        meta_num_samples = (int)(pcm_size / (2u * channels));
+        goto pack_and_return;
     }
-    else
-    {
+
+    default:
         throw std::runtime_error("XPCM: unknown codec");
     }
 
-    return nanobind::bytes(reinterpret_cast<const char *>(out.data()), out.size());
-}
-
-static nanobind::tuple xpcm_to_pcm_with_meta(nanobind::bytes xpcm_bytes)
+pack_and_return:
 {
-    // Decode bytes first (reuses the same logic)
-    nanobind::bytes pcm = xpcm_to_pcm(xpcm_bytes);
-
-    // Parse metadata from header
-    char *p = nullptr;
-    Py_ssize_t n = 0;
-    if (PyBytes_AsStringAndSize(xpcm_bytes.ptr(), &p, &n) != 0)
-        throw nanobind::python_error();
-    const uint8_t *d = reinterpret_cast<const uint8_t *>(p);
-    size_t sz = (size_t)n;
-    if (sz < 0x1C)
-        throw std::runtime_error("XPCM: buffer too small");
-    if (!(d[0] == 'X' && d[1] == 'P' && d[2] == 'C' && d[3] == 'M'))
-        throw std::runtime_error("XPCM: bad magic");
-
-    uint32_t pcm_size = read_u32le(d + 0x04);
-    uint8_t codec = d[0x08];
-    uint8_t flags = d[0x09];
-    uint16_t channels = read_u16le(d + 0x0E);
-    int32_t sample_rate = read_s32le(d + 0x10);
-    uint16_t bits_per_sample = read_u16le(d + 0x1A);
-    uint32_t num_samples = (channels != 0) ? (pcm_size / (2u * channels)) : 0u;
-
     nanobind::dict meta;
-    meta["sample_rate"] = sample_rate;
-    meta["channels"] = channels;
-    meta["bits_per_sample"] = bits_per_sample;
-    meta["num_samples"] = num_samples;
-    meta["pcm_size"] = pcm_size;
+    meta["sample_rate"] = meta_sample_rate;
+    meta["channels"] = meta_channels;
+    meta["bits_per_sample"] = meta_bits_per_sample;
+    meta["num_samples"] = meta_num_samples;
+    meta["pcm_size"] = meta_pcm_size;
     meta["codec"] = codec;
     meta["flags"] = flags;
 
-    return nanobind::make_tuple(pcm, meta);
+    return nanobind::make_tuple(nanobind::bytes(reinterpret_cast<const char *>(out.data()), out.size()), meta);
+}
 }
 
 // ============================================================================
@@ -1023,7 +1061,7 @@ void init_xpcm_extractor(nanobind::module_ &m)
     // Python API: xpcm_to_pcm(data: bytes) -> tuple[bytes, dict]
     m.def(
         "xpcm_to_pcm",
-        &xpcm_to_pcm_with_meta,
+        &xpcm_to_pcm,
         nanobind::arg("data"),
         R"pbdoc(
 Decode XPCM audio data to raw PCM16LE format.
@@ -1040,7 +1078,7 @@ Returns:
       * bits_per_sample: Bits per sample (typically 16)
       * num_samples: Total number of samples
       * pcm_size: Size of PCM data in bytes
-      * codec: XPCM codec type (0x00=raw, 0x01=LZXPCM, 0x02=ADPCM, 0x03=zlib)
+      * codec: XPCM codec type (0x00=raw, 0x01=LZXPCM, 0x02=ADPCM, 0x03=zlib, 0x05=ogg passthrough)
       * flags: Codec-specific flags
 
 Supported codecs:
@@ -1048,5 +1086,6 @@ Supported codecs:
   - 0x01: LZXPCM VQ compression (custom LZ variant)
   - 0x02: ADPCM compression
   - 0x03: zlib VQ compression
+  - 0x05: OGG passthrough (return .ogg bytes; metadata fields set to -1)
 )pbdoc");
 }

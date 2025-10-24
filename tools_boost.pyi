@@ -84,7 +84,7 @@ class xpcm_extractor:
                 * bits_per_sample (int): Bit depth (usually 16)
                 * num_samples (int): Total number of samples
                 * pcm_size (int): Total size of PCM data in bytes
-                * codec (int): XPCM codec identifier (0x00, 0x01, 0x03, 0x04)
+                * codec (int): XPCM codec identifier (0x00, 0x01, 0x02, 0x03, 0x05)
                 * flags (int): XPCM flags
 
         Raises:
