@@ -1,13 +1,10 @@
 [build-system]
-requires = ["scikit-build-core", "ninja"]
-build-backend = "scikit_build_core.build"
+requires = ["xmake-python"]
+build-backend = "xmake_python"
 
 [project]
 name = "tools-boost"
 version = "1.0.0"
 requires-python = ">=3.13"
+description = "Accelerated native module for the pure-Python project 1F1E33-float32/Tools"
 dependencies = []
-
-[tool.scikit-build]
-build-dir = "build/{wheel_tag}"
-editable.rebuild = true

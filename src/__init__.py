@@ -1,2 +1,4 @@
+from .tools_boost import catsystem2_decryptor, hca_decryptor, xpcm2pcm, opusnx2opus
+
 __version__ = "1.0.0"
-__all__ = ["cat_system_crypto", "hca_decryptor", "xpcm_extractor"]
+__all__ = ["catsystem2_decryptor", "hca_decryptor", "xpcm2pcm", "opusnx2opus"]

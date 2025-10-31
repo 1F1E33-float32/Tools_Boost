@@ -6,15 +6,5 @@ __pycache__/
 .venv
 uv.lock
 
-# Nodejs
-node_modules/
-hook.js
-
-# Claude Code
-.claude
-CLAUDE.md
-
-# Reqable
-*.har
-
+.xmake
 build
