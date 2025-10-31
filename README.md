@@ -1,13 +1,14 @@
 # Tools Boost
 
-给纯python项目[1F1E33-float32/Tools](https://github.com/1F1E33-float32/Tools)提供加速
+Accelerated native module for the pure-Python project "Tools":
+https://github.com/1F1E33-float32/Tools
 
-## 使用方法
+## Usage
 
-### CAT System Crypto
+### CatSystem2 Decryptor
 
 ```python
-from tools_boost.cat_system_crypto import MT, Blowfish
+from tools_boost.catsystem2_decryptor import MT, Blowfish
 
 mt = MT(12345)
 random_number = mt.genrand()
@@ -20,27 +21,27 @@ plaintext = bf.decrypt(ciphertext)
 ### HCA Decryptor
 
 ```python
-from tools_boost.hca_decryptor import decrypt
+from tools_boost.hca_decryptor import hca_decryptor_main
 
 with open('encrypted.hca', 'rb') as f:
     encrypted_data = f.read()
 
-decrypted_data = decrypt(encrypted_data, mainkey=0x12345678, subkey=None)
+decrypted_data = hca_decryptor_main(encrypted_data, mainkey=0x12345678, subkey=None)
 
 with open('decrypted.hca', 'wb') as f:
     f.write(decrypted_data)
 ```
 
-### XPCM Extractor
+### XPCM2PCM
 
 ```python
-from tools_boost.xpcm_extractor import xpcm_to_pcm
+from tools_boost.xpcm2pcm import xpcm2pcm_main
 import struct
 
 with open('audio.xpcm', 'rb') as f:
     xpcm_data = f.read()
 
-pcm_data, meta = xpcm_to_pcm(xpcm_data)
+pcm_data, meta = xpcm2pcm_main(xpcm_data)
 
 def write_wav(pcm_data, sample_rate, channels, bits_per_sample, output_path):
     byte_rate = sample_rate * channels * (bits_per_sample // 8)
@@ -59,12 +60,20 @@ def write_wav(pcm_data, sample_rate, channels, bits_per_sample, output_path):
 write_wav(pcm_data, meta['sample_rate'], meta['channels'], meta['bits_per_sample'], 'output.wav')
 ```
 
-## 兼容性
-只测试过以下环境：
-- `Windows 10/11 x86_64` + `Visual Studio 2022`
-- `Windows Subsystem for Linux` + `gcc`
+### OpusNX2Opus
 
-## 参考
-- https://github.com/Dir-A/CMakeModules
+```python
+from tools_boost.opusnx2opus import opusnx2opus_main
+
+with open('input.opusnx', 'rb') as f:
+    nx_data = f.read()
+
+ogg_opus_data = opusnx2opus_main(nx_data)
+
+with open('output.ogg', 'wb') as f:
+    f.write(ogg_opus_data)
+```
+
+## References
 - https://github.com/vgmstream/vgmstream
 - https://github.com/nanami5270/GARbro-Mod
